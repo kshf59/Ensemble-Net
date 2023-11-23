@@ -10,17 +10,20 @@ from torch.utils.data import Dataset
 
 
 class KittiDataset(Dataset):
-    def __init__(self, Img_Dir, Mask_Dir, scale):
+    def __init__(self, Img_Dir, Mask_Dir, Img_Size, scale):
         
         self.Img_Dir = Img_Dir
         self.Mask_Dir = Mask_Dir
         self.scale = scale
+        self.Img_Size = Img_Size
         self.ids = [splitext(file)[0] for file in listdir(Img_Dir) if not file.startswith('.')]
     
     @classmethod    
-    def preprocessing(cls, pImg, scale, is_mask):
-        w, h = pImg.size
+    def preprocessing(cls, pImg, pSize, scale, is_mask):
+        reImg = pImg.resize((pSize[1], pSize[0]), resample=Image.NEAREST if is_mask else Image.BICUBIC)
+        w, h = reImg.size
         newW, newH = int(scale * w), int(scale * h)
+        
         pil_img = pImg.resize((newW, newH), resample=Image.NEAREST if is_mask else Image.BICUBIC)
 
         img_ndarray = np.asarray(pil_img)
@@ -39,14 +42,14 @@ class KittiDataset(Dataset):
         
         name = self.ids[idx]
         
-        img_file = list(self.images_dir.glob(name + '*.png'))  
-        mask_file = list(self.masks_dir.glob(name + '*.png'))
+        img_file = list(self.Img_Dir.glob(name + '*.png'))  
+        mask_file = list(self.Mask_Dir.glob(name + '*.png'))
               
-        img = Image.opeen(img_file[0])
+        img = Image.open(img_file[0])
         mask = Image.open(mask_file[0])
         
-        img = self.preprocess(img, self.scale, is_mask=False)
-        mask = self.preprocess(mask, self.scale, is_mask=True)   
+        img = self.preprocessing(img, self.Img_Size, self.scale, is_mask=False)
+        mask = self.preprocessing(mask, self.Img_Size, self.scale, is_mask=True)   
         
         
         return {
