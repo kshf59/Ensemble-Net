@@ -21,6 +21,8 @@ rad.json
 #Test results file
 TestResults.xml
 
+# data
+*.png
 
 .ipynb_checkpoints
 __pycache__

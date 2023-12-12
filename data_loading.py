@@ -25,6 +25,7 @@ class BasicDataset(Dataset):
     def __len__(self):
         return len(self.ids)
 
+    
     @classmethod
     def preprocess(cls, pil_img, scale, is_mask):
         
@@ -64,7 +65,9 @@ class BasicDataset(Dataset):
             return Image.open(filename)
 
     def __getitem__(self, idx):
+        
         name = self.ids[idx]
+        
         #mask_file = list(self.masks_dir.glob(name + self.mask_suffix + '.*'))
         mask_file = list(self.masks_dir.glob(name + '.*'))
         img_file = list(self.images_dir.glob(name + '.*'))
