@@ -158,6 +158,6 @@ class SegNet(nn.Module):
         x = F.relu(self.BNDe12(self.ConvDe12(x)))
         x = self.ConvDe11(x)
 
-        x = F.softmax(x, dim=1)
+        #x = F.softmax(x, dim=1)
 
         return x
