@@ -130,6 +130,7 @@ class SegNet(nn.Module):
         size5 = x.size()
 
         #DECODE LAYERS
+        
         #Stage 5
         x = self.MaxDe(x, ind5, output_size=size4)
         x = F.relu(self.BNDe53(self.ConvDe53(x)))
@@ -154,6 +155,9 @@ class SegNet(nn.Module):
         x = F.relu(self.BNDe21(self.ConvDe21(x)))
 
         #Stage 1
+        print(x.shape)
+        print(ind1.shape)        
+
         x = self.MaxDe(x, ind1)
         x = F.relu(self.BNDe12(self.ConvDe12(x)))
         x = self.ConvDe11(x)
