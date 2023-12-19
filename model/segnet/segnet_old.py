@@ -1,11 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .segnet_parts import *
 
 
-
-
+'''
 class SegNet(nn.Module):
 
     def __init__(self, n_channels, n_classes, BN_momentum=0.5):
@@ -122,49 +120,4 @@ class SegNet(nn.Module):
         output = self.conv_de11(dex1)
 
         return output
-
-
-
-
-'''
-class SegNet(nn.Module):
-    def __init__(self, n_channels, n_classes, BN_momentum=0.5):
-        super(SegNet, self).__init__()
-        self.n_channels = n_channels
-        self.n_classes = n_classes
-        self.out_channels = [64, 128, 256, 512]
-
-        self.encoder_layers = self._make_layers(Conv_BatchNorm, self.n_channels, self.out_channels, BN_momentum)
-        self.decoder_layers = self._make_layers(Conv_BatchNorm, self.out_channels[-1], self.out_channels[::-1], BN_momentum)
-
-        self.conv_de11 = nn.Conv2d(self.out_channels[0], self.n_classes, kernel_size=3, padding=1)
-
-    def _make_layers(self, block, in_channels, channels, BN_momentum):
-        layers = []
-        for out_channels in channels:
-            layers += [block(in_channels, out_channels, BN_momentum),
-                       block(out_channels, out_channels, BN_momentum)]
-            in_channels = out_channels
-        return nn.Sequential(*layers)
-
-    def forward(self, x):
-        indices = []
-        sizes = []
-        for layer in self.encoder_layers:
-            if isinstance(layer, nn.MaxPool2d):
-                x, idx = layer(x)
-                indices.append(idx)
-                sizes.append(x.size())
-
-        for layer in self.decoder_layers:
-            if isinstance(layer, nn.MaxUnpool2d):
-                idx = indices.pop()
-                size = sizes.pop()
-                x = layer(x, idx, output_size=size)
-            else:
-                x = layer(x)
-
-        x = self.conv_de11(x)
-        return x
-        
 '''
