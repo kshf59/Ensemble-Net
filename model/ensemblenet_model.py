@@ -34,7 +34,7 @@ class EnsembleNet(nn.Module):
     def forward(self, x):
         
         unet = self.unet(x)
-        segnet = self.unet(x)
+        segnet = self.segnet(x)
         #out1, out2 = self.fusion(unet, segnet)
         #return result1, result2
         return unet, segnet
