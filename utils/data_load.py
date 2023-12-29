@@ -36,15 +36,15 @@ def unique_mask_values(idx, mask_dir, mask_suffix):
 
         
 class KittiDataset(Dataset):
-    def __init__(self, images_dir: str, mask_dir: str, image_size = list, scale: float = 1.0, mask_suffix: str = ''):
-    #def __init__(self, images_dir: str, mask_dir: str, image_size = list, scale: float = 1.0, mask_suffix: str = '', transform = None):
+    #def __init__(self, images_dir: str, mask_dir: str, image_size = list, scale: float = 1.0, mask_suffix: str = ''):
+    def __init__(self, images_dir: str, mask_dir: str, image_size = list, scale: float = 1.0, transform = None, mask_suffix: str = ''):
         self.images_dir = Path(images_dir)
         self.mask_dir = Path(mask_dir)
         assert 0 < scale <= 1, 'Scale must be between 0 and 1'
         self.image_size = image_size 
         self.scale = scale
         self.mask_suffix = mask_suffix
-        #self.transform = transform
+        self.transform = transform
         
         self.ids = [splitext(file)[0] for file in listdir(images_dir) if isfile(join(images_dir, file)) and not file.startswith('.')]
         if not self.ids:
@@ -91,10 +91,10 @@ class KittiDataset(Dataset):
                 img = img[np.newaxis, ...]
             else:
                 img = img.transpose((2, 0, 1))
-
+            '''
             if (img > 1).any():
                 img = img / 255.0
-
+            '''
             return img
 
     def __getitem__(self, idx):
@@ -110,20 +110,52 @@ class KittiDataset(Dataset):
         assert img.size == mask.size, \
             f'Image and mask {name} should be the same size, but are {img.size} and {mask.size}'
         
+        
+        img = self.preprocess(self.mask_values, img, self.image_size, self.scale, is_mask=False)
+        mask = self.preprocess(self.mask_values, mask, self.image_size, self.scale, is_mask=True)
+        #print(img)
+        #print(img.shape)
+        
+        
         if self.transform is not None:
+            #img = np.array(img); mask = np.array(mask); 
             aug_set = self.transform(image=img, mask=mask)
             img = aug_set['image']
             mask = aug_set['mask']
-        
-        
-        img = self.preprocess(self.mask_values, img, self.image_size, self.scale, is_mask=False)
-        mask = self.preprocess(self.mask_values, mask, self.image_size, self.scale, is_mask=True)       
+            img = Image.fromarray(img); mask = Image.fromarray(mask)
+         
             
         return {
             'image': torch.as_tensor(img.copy()).float().contiguous(),
             'mask': torch.as_tensor(mask.copy()).long().contiguous()
         }        
-        
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+###############################################################################################################################################################################  
+    
+    
+    
+    
+    
+    
+    
+    
+    
         
 '''
 class KittiDataset(Dataset):
