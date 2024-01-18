@@ -36,8 +36,8 @@ def unique_mask_values(idx, mask_dir, mask_suffix):
 
         
 class KittiDataset(Dataset):
-    #def __init__(self, images_dir: str, mask_dir: str, image_size: list, scale: float = 1.0, transform = None, mask_suffix: str = ''):
-    def __init__(self, images_dir: str, mask_dir: str, image_size: list, mode: str, scale: float = 1.0, transform = None, mask_suffix: str = ''):
+    def __init__(self, images_dir: str, mask_dir: str, image_size: list, scale: float = 1.0, transform = None, mask_suffix: str = ''):
+    #def __init__(self, images_dir: str, mask_dir: str, image_size: list, mode: str, scale: float = 1.0, transform = None, mask_suffix: str = ''):
         self.images_dir = Path(images_dir)
         self.mask_dir = Path(mask_dir)
         assert 0 < scale <= 1, 'Scale must be between 0 and 1'
@@ -45,11 +45,11 @@ class KittiDataset(Dataset):
         self.scale = scale
         self.mask_suffix = mask_suffix
         
-        
+        '''
         self.mode = mode
         if self.mode.lower() not in ('train', 'validation', 'test'):
             raise ValueError("'model_name' should be one of ('train', 'validation', 'test')")
-        
+        '''
         
         self.transform = transform
         
@@ -110,7 +110,9 @@ class KittiDataset(Dataset):
 
     def __getitem__(self, idx):
         name = self.ids[idx]
-        mask_file = list(self.mask_dir.glob(name + self.mask_suffix + '.*'))
+        
+        #mask_file = list(self.mask_dir.glob(name + self.mask_suffix + '.*'))
+        mask_file = list(self.mask_dir.glob(name.split('_')[0] +'_'+ name.split('_')[2] + '.*'))
         img_file = list(self.images_dir.glob(name + '.*'))
 
         assert len(img_file) == 1, f'Either no image or multiple images found for the ID {name}: {img_file}'
