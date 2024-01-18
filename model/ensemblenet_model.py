@@ -38,42 +38,43 @@ class EnsembleNet(nn.Module):
             self.segnet = SegNet(n_channels=self.n_channels, n_classes=self.n_classes)
             self.deeplab = DeepLabv3(num_classes = self.n_classes, pretrained = False)
             
-            self.conv_out1 = nn.Conv2d(self.n_classes * 3, self.n_classes, kernel_size=3, padding=1)
-            self.conv_out2 = nn.Conv2d(self.n_classes, self.n_classes, kernel_size=3, padding=1)
-        
-        '''    
-        self.double_conv = nn.Sequential(
-            nn.Conv2d(self.n_classes, mid_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(mid_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
-        )
-        '''
+            self.conv_batchnorm1 = nn.Sequential(
+                    nn.Conv2d(self.n_classes * 3, self.n_classes, kernel_size=3, padding=1),
+                    nn.BatchNorm2d(self.n_classes, momentum=0.5),
+                    nn.ReLU(inplace=True)
+            )
+            self.conv_batchnorm2 = nn.Sequential(
+                    nn.Conv2d(self.n_classes, self.n_classes, kernel_size=3, padding=1),
+                    nn.BatchNorm2d(self.n_classes, momentum=0.5),
+                    nn.ReLU(inplace=True)
+            )   
+            self.conv_out = nn.Conv2d(self.n_classes, self.n_classes, kernel_size=3, padding=1)
         
     
     def forward(self, x):
     
         if self.model_name == 'unet':
             out = self.unet(x)
-    
+            return out
+                
         if self.model_name == 'segnet':
             out = self.segnet(x)
-            
+            return out
+                
         if self.model_name == 'deeplabv3':
             out = self.deeplab(x)
-            
+            return out
+                
         if self.model_name == 'ensemble_voting':
             out = (F.softmax(self.unet(x), dim=1) + F.softmax(self.segnet(x), dim=1) + F.softmax(self.deeplab(x)['out'], dim=1)) / 3.0
             #out = (self.unet(x) + self.segnet(x) + self.deeplab(x)['out']) / 3.0
-            
+            return out
+                
         if self.model_name == 'ensemble_fusion':
             fused_out = torch.cat([self.unet(x), self.segnet(x), self.deeplab(x)['out']], dim=1)
-            conv_out = self.conv_out1(fused_out)
-            out = self.conv_out2(conv_out)
+            bn_out = self.conv_batchnorm1(fused_out)
+            bn_out = self.conv_batchnorm2(bn_out)
+            out = self.conv_out(bn_out)
+            return out     
             
-            
-        return out
- 
 
