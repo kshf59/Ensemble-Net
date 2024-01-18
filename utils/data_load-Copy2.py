@@ -36,24 +36,22 @@ def unique_mask_values(idx, mask_dir, mask_suffix):
 
         
 class KittiDataset(Dataset):
-    #def __init__(self, images_dir: str, mask_dir: str, image_size: list, scale: float = 1.0, transform = None, mask_suffix: str = ''):
-    def __init__(self, images_dir: str, mask_dir: str, image_size: list, mode: str, scale: float = 1.0, transform = None, mask_suffix: str = ''):
+    #def __init__(self, images_dir: str, mask_dir: str, image_size = list, scale: float = 1.0, mask_suffix: str = ''):
+    def __init__(self, images_dir: str, mask_dir: str, image_file = list, mask_file = list, image_size = list, scale: float = 1.0, mode : str, transform = None, mask_suffix: str = ''):
+    #def __init__(self, images_dir: str, mask_dir: str, image_size = list, scale: float = 1.0, mode : str, transform = None, mask_suffix: str = ''):
         self.images_dir = Path(images_dir)
         self.mask_dir = Path(mask_dir)
+        self.image_file = image_file
+        self.mask_file = mask_file
         assert 0 < scale <= 1, 'Scale must be between 0 and 1'
         self.image_size = image_size
         self.scale = scale
         self.mask_suffix = mask_suffix
-        
-        
         self.mode = mode
+        self.transform = transform
+
         if self.mode.lower() not in ('train', 'validation', 'test'):
             raise ValueError("'model_name' should be one of ('train', 'validation', 'test')")
-        
-        
-        self.transform = transform
-        
-
         
         
         
@@ -116,17 +114,19 @@ class KittiDataset(Dataset):
         assert len(img_file) == 1, f'Either no image or multiple images found for the ID {name}: {img_file}'
         assert len(mask_file) == 1, f'Either no mask or multiple masks found for the ID {name}: {mask_file}'
         mask = load_image(mask_file[0])
-        img = load_image(img_file[0])   
-        '''
-        if self.mode == 'train':
+        img = load_image(img_file[0])
+        #mask = load_image(self.image_file[0])
+        #img = load_image(self.mask_file[0])        
+
+        
+        if mode == 'train':
             if self.transform is not None:
                 img = np.array(img); mask = np.array(mask); 
                 aug_set = self.transform(image=img, mask=mask)
                 img = aug_set['image']
                 mask = aug_set['mask']
-                #img = Image.fromarray(np.array(img)); mask = Image.fromarray(np.array(mask))
                 img = Image.fromarray(img); mask = Image.fromarray(mask)
-        '''
+        
         img = self.preprocess(self.mask_values, img, self.image_size, self.scale, is_mask=False)
         mask = self.preprocess(self.mask_values, mask, self.image_size, self.scale, is_mask=True)
         #print(img)
