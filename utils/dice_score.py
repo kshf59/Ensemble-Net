@@ -1,9 +1,12 @@
 import torch
 from torch import Tensor
+import torch.nn.functional as F
 
-
+'''
 def dice_coeff(input: Tensor, target: Tensor, reduce_batch_first: bool = False, epsilon: float = 1e-6):
     # Average of Dice coefficient for all batches, or for a single mask
+    print(input.size())
+    print(target.size())
     assert input.size() == target.size()
     assert input.dim() == 3 or not reduce_batch_first
 
@@ -15,6 +18,27 @@ def dice_coeff(input: Tensor, target: Tensor, reduce_batch_first: bool = False, 
 
     dice = (inter + epsilon) / (sets_sum + epsilon)
     return dice.mean()
+'''
+
+def dice_coeff(Input: Tensor, target: Tensor, reduce_batch_first: bool = False, epsilon: float = 1e-6):
+    # Average of Dice coefficient for all batches, or for a single mask
+    
+    #Input = F.sigmoid(Input.squeeze(1))
+    #Input = torch.sigmoid(Input.squeeze(1))
+    #target = target.float()
+    
+    assert Input.size() == target.size()
+    assert Input.dim() == 3 or not reduce_batch_first
+
+    sum_dim = (-1, -2) if Input.dim() == 2 or not reduce_batch_first else (-1, -2, -3)
+
+    inter = 2 * (Input * target).sum(dim=sum_dim)
+    sets_sum = Input.sum(dim=sum_dim) + target.sum(dim=sum_dim)
+    sets_sum = torch.where(sets_sum == 0, inter, sets_sum)
+
+    dice = (inter + epsilon) / (sets_sum + epsilon)
+    return dice.mean()
+
 
 
 def multiclass_dice_coeff(input: Tensor, target: Tensor, reduce_batch_first: bool = False, epsilon: float = 1e-6):
