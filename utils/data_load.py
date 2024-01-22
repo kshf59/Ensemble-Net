@@ -25,6 +25,7 @@ def load_image(filename):
 
 def unique_mask_values(idx, mask_dir, mask_suffix):
     mask_file = list(mask_dir.glob(idx + mask_suffix + '.*'))[0]
+    #mask_file = list(mask_dir.glob(idx.split('_')[0] +'_'+ idx.split('_')[2] + '.*'))[0]
     mask = np.asarray(load_image(mask_file))
     if mask.ndim == 2:
         return np.unique(mask)
@@ -111,8 +112,8 @@ class KittiDataset(Dataset):
     def __getitem__(self, idx):
         name = self.ids[idx]
         
-        #mask_file = list(self.mask_dir.glob(name + self.mask_suffix + '.*'))
-        mask_file = list(self.mask_dir.glob(name.split('_')[0] +'_'+ name.split('_')[2] + '.*'))
+        mask_file = list(self.mask_dir.glob(name + self.mask_suffix + '.*'))
+        #mask_file = list(self.mask_dir.glob(name.split('_')[0] +'_'+ name.split('_')[2] + '.*'))
         img_file = list(self.images_dir.glob(name + '.*'))
 
         assert len(img_file) == 1, f'Either no image or multiple images found for the ID {name}: {img_file}'
