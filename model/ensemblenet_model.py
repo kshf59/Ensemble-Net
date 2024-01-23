@@ -66,14 +66,17 @@ class EnsembleNet(nn.Module):
             return out
                 
         if self.model_name == 'ensemble_voting':
-            out = (F.softmax(self.unet(x), dim=1) + F.softmax(self.segnet(x), dim=1) + F.softmax(self.deeplab(x)['out'], dim=1)) / 3.0
+            #out = (F.softmax(self.unet(x), dim=1) + F.softmax(self.segnet(x), dim=1) + F.softmax(self.deeplab(x)['out'], dim=1)) / 3.0
             #out = (self.unet(x) + self.segnet(x) + self.deeplab(x)['out']) / 3.0
-            return out
+            unet_out = self.unet(x)
+            segnet_out = self.segnet(x)
+            deeplab_out = self.deeplab(x)
+            return unet_out, segnet_out, deeplab_out
                 
         if self.model_name == 'ensemble_fusion':
             fused_out = torch.cat([self.unet(x), self.segnet(x), self.deeplab(x)['out']], dim=1)
             bn_out = self.conv_batchnorm1(fused_out)
-            bn_out = self.conv_batchnorm2(bn_out)
+            #bn_out = self.conv_batchnorm2(bn_out)
             out = self.conv_out(bn_out)
             return out     
             
