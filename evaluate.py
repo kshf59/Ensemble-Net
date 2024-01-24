@@ -12,7 +12,7 @@ def evaluate(net, dataloader, device, model_name, amp):
     dice_score = 0
     unet_dice_score = 0
     segnet_dice_score = 0
-    deeplab_dice_score = 0
+    enet_dice_score = 0
     voting_dice_score = 0
 
     # iterate over the validation set
@@ -26,19 +26,13 @@ def evaluate(net, dataloader, device, model_name, amp):
             image = image.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
             mask_true = mask_true.to(device=device, dtype=torch.long)
             
-            '''
-            # predict the mask
-            mask_pred = net(image)
-            if isinstance(mask_pred, OrderedDict):
-                mask_pred = mask_pred['out']                        
-            '''
                 
             if model_name == 'ensemble_voting':
-                upred, spred, dpred = net(image)
-                dpred = dpred['out']
+                upred, spred, epred = net(image)
+                #dpred = dpred['out']
             else:
                 mask_pred = net(image)
-                if isinstance(masks_pred, OrderedDict):
+                if isinstance(mask_pred, OrderedDict):
                     mask_pred = mask_pred['out']
                 
             try:
@@ -65,15 +59,15 @@ def evaluate(net, dataloader, device, model_name, amp):
                 mask_true = F.one_hot(mask_true, mn_clss).permute(0, 3, 1, 2).float()
                 upred = F.one_hot(upred.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
                 spred = F.one_hot(spred.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
-                dpred = F.one_hot(dpred.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
+                epred = F.one_hot(epred.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
                 
-                vot = (F.softmax(upred, dim=1) + F.softmax(spred, dim=1) + F.softmax(dpred, dim=1)) / 3.0
+                vot = (F.softmax(upred, dim=1) + F.softmax(spred, dim=1) + F.softmax(epred, dim=1)) / 3.0
                 vot = F.one_hot(vot.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
                 
 
                 unet_dice_score += multiclass_dice_coeff(upred[:, 1:], mask_true[:, 1:], reduce_batch_first=False)
                 segnet_dice_score += multiclass_dice_coeff(spred[:, 1:], mask_true[:, 1:], reduce_batch_first=False)
-                deeplab_dice_score += multiclass_dice_coeff(dpred[:, 1:], mask_true[:, 1:], reduce_batch_first=False)
+                enet_dice_score += multiclass_dice_coeff(epred[:, 1:], mask_true[:, 1:], reduce_batch_first=False)
                 
                 voting_dice_score += multiclass_dice_coeff(vot[:, 1:], mask_true[:, 1:], reduce_batch_first=False)
                 
@@ -92,10 +86,10 @@ def evaluate(net, dataloader, device, model_name, amp):
         
         uresult = unet_dice_score / max(num_val_batches, 1)
         sresult = segnet_dice_score / max(num_val_batches, 1)
-        dresult = deeplab_dice_score / max(num_val_batches, 1)
+        eresult = enet_dice_score / max(num_val_batches, 1)
         votresult = voting_dice_score / max(num_val_batches, 1)
         
-        return uresult, sresult, dresult, votresult
+        return uresult, sresult, eresult, votresult
     
     else:
         dice_result = dice_score / max(num_val_batches, 1)

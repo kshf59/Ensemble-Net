@@ -4,8 +4,12 @@ import torch.nn.functional as F
 
 from model.unet.unet_model import UNet
 from model.segnet.segnet_model import SegNet
-from torchvision.models.segmentation import deeplabv3_resnet101 as DeepLabv3
+from model.Enet.enet import ENet
+#from torchvision.models.segmentation import deeplabv3_resnet101 as DeepLabv3
+#from torchvision.models.segmentation import deeplabv3_mobilenet_v3_large as DeepLabv3
+#from torchvision.models.segmentation import lraspp_mobilenet_v3_large as DeepLabv3
 
+#from torchvision.models.segmentation import fcn_resnet50 as DeepLabv3
 
 #voting
 #stacking
@@ -21,8 +25,8 @@ class EnsembleNet(nn.Module):
         self.n_channels = n_ch
         self.n_classes = n_cls
         
-        if self.model_name.lower() not in ("unet", "segnet", 'deeplabv3', "ensemble_voting", "ensemble_fusion"):
-            raise ValueError("'model_name' should be one of ('unet', 'segnet', 'deeplabv3', 'ensemble_voting', 'ensemble_fusion')")
+        if self.model_name.lower() not in ("unet", "segnet", 'enet', "ensemble_voting", "ensemble_fusion"):
+            raise ValueError("'model_name' should be one of ('unet', 'segnet', 'enet', 'ensemble_voting', 'ensemble_fusion')")
         
         if self.model_name == 'unet':
             self.unet = UNet(n_channels=self.n_channels, n_classes=self.n_classes, bilinear=True)
@@ -30,13 +34,14 @@ class EnsembleNet(nn.Module):
         if self.model_name == 'segnet':
             self.segnet = SegNet(n_channels=self.n_channels, n_classes=self.n_classes)
             
-        if self.model_name == 'deeplabv3':
-            self.deeplab = DeepLabv3(num_classes = self.n_classes, pretrained = False)
-        
+        if self.model_name == 'enet':
+            #self.deeplab = DeepLabv3(num_classes = self.n_classes, pretrained = False)
+            self.enet = model = ENet(self.n_classes)
+            
         if 'ensemble' in self.model_name:
             self.unet = UNet(n_channels=self.n_channels, n_classes=self.n_classes, bilinear=True)
             self.segnet = SegNet(n_channels=self.n_channels, n_classes=self.n_classes)
-            self.deeplab = DeepLabv3(num_classes = self.n_classes, pretrained = False)
+            self.enet = ENet(self.n_classes)
             
             self.conv_batchnorm1 = nn.Sequential(
                     nn.Conv2d(self.n_classes * 3, self.n_classes, kernel_size=3, padding=1),
@@ -61,8 +66,8 @@ class EnsembleNet(nn.Module):
             out = self.segnet(x)
             return out
                 
-        if self.model_name == 'deeplabv3':
-            out = self.deeplab(x)
+        if self.model_name == 'enet':
+            out = self.enet(x)
             return out
                 
         if self.model_name == 'ensemble_voting':
@@ -70,8 +75,8 @@ class EnsembleNet(nn.Module):
             #out = (self.unet(x) + self.segnet(x) + self.deeplab(x)['out']) / 3.0
             unet_out = self.unet(x)
             segnet_out = self.segnet(x)
-            deeplab_out = self.deeplab(x)
-            return unet_out, segnet_out, deeplab_out
+            enet_out = self.enet(x)
+            return unet_out, segnet_out, enet_out
                 
         if self.model_name == 'ensemble_fusion':
             fused_out = torch.cat([self.unet(x), self.segnet(x), self.deeplab(x)['out']], dim=1)
