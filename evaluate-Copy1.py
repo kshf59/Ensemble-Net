@@ -79,9 +79,6 @@ def evaluate(net, dataloader, device, model_name, amp):
 
                 # compute the Dice score, ignoring background
                 dice_score += multiclass_dice_coeff(mask_pred[:, 1:], mask_true[:, 1:], reduce_batch_first=False)
-                
-                #with torch.no_grad():
-                #    val_loss = 0
 
     net.train()
     
