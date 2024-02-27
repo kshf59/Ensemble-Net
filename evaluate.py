@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 from collections import OrderedDict
-from utils.dice_score import multiclass_dice_coeff, dice_coeff, dice_loss
+from utils.dice_score import multiclass_dice_coeff, dice_coeff, dice_loss, pixel_accuracy, mIoU
 import torch.nn as nn
 
 
@@ -81,7 +81,9 @@ def evaluate(net, dataloader, _criterion_, device, model_name, amp):
                     F.one_hot(mask_true, mn_clss).permute(0, 3, 1, 2).float(),
                     multiclass=True
                 )
-                losses = valloss.cpu().detach().numpy()            
+                losses = valloss.cpu().detach().numpy()    
+            pixACU = pixel_accuracy(vot, mask_true)     
+            miou = mIoU(vot, mask_true)
             
         else:
             
@@ -92,8 +94,13 @@ def evaluate(net, dataloader, _criterion_, device, model_name, amp):
                     F.one_hot(mask_true, mn_clss).permute(0, 3, 1, 2).float(),
                     multiclass=True
                 )
+            
                 losses = valloss.cpu().detach().numpy()
-                  
+                
+            pixACU = pixel_accuracy(mask_pred, mask_true)     
+            miou = mIoU(mask_pred, mask_true)
+
+
     net.train()
     
     if model_name == 'ensemble_voting':
@@ -103,12 +110,12 @@ def evaluate(net, dataloader, _criterion_, device, model_name, amp):
         eresult = enet_dice_score / max(num_val_batches, 1)
         votresult = voting_dice_score / max(num_val_batches, 1)
         
-        return uresult, sresult, eresult, votresult, losses
+        return uresult, sresult, eresult, votresult, losses, pixACU, miou
     
     else:
         dice_result = dice_score / max(num_val_batches, 1)
         
-        return dice_result, losses
+        return dice_result, losses, pixACU, miou
     
     
     
