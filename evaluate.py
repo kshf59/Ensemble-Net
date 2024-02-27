@@ -2,11 +2,13 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 from collections import OrderedDict
-from utils.dice_score import multiclass_dice_coeff, dice_coeff
+from utils.dice_score import multiclass_dice_coeff, dice_coeff, dice_loss
+import torch.nn as nn
+
 
 
 @torch.inference_mode()
-def evaluate(net, dataloader, device, model_name, amp):
+def evaluate(net, dataloader, _criterion_, device, model_name, amp):
     net.eval()
     num_val_batches = len(dataloader)
     dice_score = 0
@@ -14,7 +16,9 @@ def evaluate(net, dataloader, device, model_name, amp):
     segnet_dice_score = 0
     enet_dice_score = 0
     voting_dice_score = 0
-
+    
+    #_criterion_ = nn.CrossEntropyLoss()
+    
     # iterate over the validation set
     with torch.autocast(device.type if device.type != 'mps' else 'cpu', enabled=amp):
         #for batch in tqdm(dataloader, total=num_val_batches, desc='Validation round', unit='batch', leave=False):
@@ -40,49 +44,56 @@ def evaluate(net, dataloader, device, model_name, amp):
             except:
                 mn_clss = net.classifier[-1].out_channels
                 
-                
-            '''    
-            if mn_clss == 1:
-                assert mask_true.min() >= 0 and mask_true.max() <= 1, 'True mask indices should be in [0, 1]'
-                mask_pred = (F.sigmoid(mask_pred) > 0.5).float()
-                # compute the Dice score
-                dice_score += dice_coeff(mask_pred, mask_true, reduce_batch_first=False)
-            else:
-                assert mask_true.min() >= 0 and mask_true.max() < mn_clss, 'True mask indices should be in [0, n_classes['
-                # convert to one-hot format
-                mask_true = F.one_hot(mask_true, mn_clss).permute(0, 3, 1, 2).float()
-            '''
-                
+
             if model_name == 'ensemble_voting':
                 assert mask_true.min() >= 0 and mask_true.max()
                 
-                mask_true = F.one_hot(mask_true, mn_clss).permute(0, 3, 1, 2).float()
-                upred = F.one_hot(upred.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
-                spred = F.one_hot(spred.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
-                epred = F.one_hot(epred.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
-                
-                vot = (F.softmax(upred, dim=1) + F.softmax(spred, dim=1) + F.softmax(epred, dim=1)) / 3.0
-                vot = F.one_hot(vot.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
+                mask_true2 = F.one_hot(mask_true, mn_clss).permute(0, 3, 1, 2).float()
+                upred2 = F.one_hot(upred.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
+                spred2 = F.one_hot(spred.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
+                epred2 = F.one_hot(epred.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
+                  
+                vot = (F.softmax(upred2, dim=1) + F.softmax(spred2, dim=1) + F.softmax(epred2, dim=1)) / 3.0
+                vot2 = F.one_hot(vot.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
                 
 
-                unet_dice_score += multiclass_dice_coeff(upred[:, 1:], mask_true[:, 1:], reduce_batch_first=False)
-                segnet_dice_score += multiclass_dice_coeff(spred[:, 1:], mask_true[:, 1:], reduce_batch_first=False)
-                enet_dice_score += multiclass_dice_coeff(epred[:, 1:], mask_true[:, 1:], reduce_batch_first=False)
+                unet_dice_score += multiclass_dice_coeff(upred2[:, 1:], mask_true2[:, 1:], reduce_batch_first=False)
+                segnet_dice_score += multiclass_dice_coeff(spred2[:, 1:], mask_true2[:, 1:], reduce_batch_first=False)
+                enet_dice_score += multiclass_dice_coeff(epred2[:, 1:], mask_true2[:, 1:], reduce_batch_first=False)
                 
-                voting_dice_score += multiclass_dice_coeff(vot[:, 1:], mask_true[:, 1:], reduce_batch_first=False)
+                voting_dice_score += multiclass_dice_coeff(vot2[:, 1:], mask_true2[:, 1:], reduce_batch_first=False)
                 
                 
 
             else:
-                mask_true = F.one_hot(mask_true, mn_clss).permute(0, 3, 1, 2).float()
-                mask_pred = F.one_hot(mask_pred.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
+                mask_true2 = F.one_hot(mask_true, mn_clss).permute(0, 3, 1, 2).float()
+                mask_pred2 = F.one_hot(mask_pred.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
 
                 # compute the Dice score, ignoring background
-                dice_score += multiclass_dice_coeff(mask_pred[:, 1:], mask_true[:, 1:], reduce_batch_first=False)
+                dice_score += multiclass_dice_coeff(mask_pred2[:, 1:], mask_true2[:, 1:], reduce_batch_first=False)
                 
-                #with torch.no_grad():
-                #    val_loss = 0
-
+        if model_name == 'ensemble_voting':
+            
+            with torch.no_grad():
+                valloss = _criterion_(vot, mask_true)
+                valloss += dice_loss(
+                    vot,
+                    F.one_hot(mask_true, mn_clss).permute(0, 3, 1, 2).float(),
+                    multiclass=True
+                )
+                losses = valloss.cpu().detach().numpy()            
+            
+        else:
+            
+            with torch.no_grad():
+                valloss = _criterion_(mask_pred, mask_true)
+                valloss += dice_loss(
+                    F.softmax(mask_pred, dim=1).float(),
+                    F.one_hot(mask_true, mn_clss).permute(0, 3, 1, 2).float(),
+                    multiclass=True
+                )
+                losses = valloss.cpu().detach().numpy()
+                  
     net.train()
     
     if model_name == 'ensemble_voting':
@@ -92,12 +103,12 @@ def evaluate(net, dataloader, device, model_name, amp):
         eresult = enet_dice_score / max(num_val_batches, 1)
         votresult = voting_dice_score / max(num_val_batches, 1)
         
-        return uresult, sresult, eresult, votresult
+        return uresult, sresult, eresult, votresult, losses
     
     else:
         dice_result = dice_score / max(num_val_batches, 1)
         
-        return dice_result
+        return dice_result, losses
     
     
     
