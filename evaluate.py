@@ -53,7 +53,8 @@ def evaluate(net, dataloader, _criterion_, device, model_name, amp):
                 spred2 = F.one_hot(spred.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
                 epred2 = F.one_hot(epred.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
                   
-                vot = (F.softmax(upred2, dim=1) + F.softmax(spred2, dim=1) + F.softmax(epred2, dim=1)) / 3.0
+                #vot = (F.softmax(upred2, dim=1) + F.softmax(spred2, dim=1) + F.softmax(epred2, dim=1)) / 3.0
+                vot = (F.softmax(upred, dim=1) + F.softmax(spred, dim=1) + F.softmax(epred, dim=1)) / 3.0
                 vot2 = F.one_hot(vot.argmax(dim=1), mn_clss).permute(0, 3, 1, 2).float()
                 
 
