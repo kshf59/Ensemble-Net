@@ -7,6 +7,7 @@ import torch.nn as nn
 
 
 
+
 @torch.inference_mode()
 def evaluate(net, dataloader, _criterion_, device, model_name, amp):
     net.eval()
@@ -16,6 +17,18 @@ def evaluate(net, dataloader, _criterion_, device, model_name, amp):
     segnet_dice_score = 0
     enet_dice_score = 0
     voting_dice_score = 0
+    
+    
+    def calculate_loss2(pred, true_masks, nclass, multiclass):
+        with torch.no_grad():
+            loss = _criterion_(pred, true_masks)
+            loss += dice_loss(
+                F.softmax(pred, dim=1).float(),
+                F.one_hot(true_masks, nclass).permute(0, 3, 1, 2).float(),
+                multiclass=multiclass
+            )
+        loss = loss.cpu().detach().numpy()
+        return loss
     
     #_criterion_ = nn.CrossEntropyLoss()
     
@@ -75,6 +88,12 @@ def evaluate(net, dataloader, _criterion_, device, model_name, amp):
                 
         if model_name == 'ensemble_voting':
             
+            uloss = calculate_loss2(upred, mask_true, mn_clss, True)
+            sloss = calculate_loss2(spred, mask_true, mn_clss, True)
+            eloss = calculate_loss2(epred, mask_true, mn_clss, True)
+            losses = (uloss + sloss + eloss) / 3
+            
+            '''
             with torch.no_grad():
                 valloss = _criterion_(vot, mask_true)
                 valloss += dice_loss(
@@ -82,7 +101,8 @@ def evaluate(net, dataloader, _criterion_, device, model_name, amp):
                     F.one_hot(mask_true, mn_clss).permute(0, 3, 1, 2).float(),
                     multiclass=True
                 )
-                losses = valloss.cpu().detach().numpy()    
+                losses = valloss.cpu().detach().numpy()
+            '''
             pixACU = pixel_accuracy(vot, mask_true)     
             miou = mIoU(vot, mask_true)
             

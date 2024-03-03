@@ -52,7 +52,8 @@ class EnsembleNet(nn.Module):
                     nn.Conv2d(self.n_classes, self.n_classes, kernel_size=3, padding=1),
                     nn.BatchNorm2d(self.n_classes, momentum=0.5),
                     nn.ReLU(inplace=True)
-            )   
+            )
+
             self.conv_out = nn.Conv2d(self.n_classes, self.n_classes, kernel_size=3, padding=1)
         
     
