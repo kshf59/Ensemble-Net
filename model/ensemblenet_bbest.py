@@ -18,27 +18,6 @@ from model.Enet.enet import ENet
 
 
 class EnsembleNet(nn.Module):
-    
-    
-    class SEBlock(nn.Module):
-        def __init__(self, channels):
-            super(EnsembleNet.SEBlock, self).__init__()
-            self.squeeze = nn.AdaptiveAvgPool2d(1)
-            self.excitation = nn.Sequential(
-                nn.Linear(channels, channels // 2),
-                nn.ReLU(inplace=True),
-                nn.Linear(channels // 2, channels),
-                nn.Sigmoid()
-            )
-
-        def forward(self, x):
-            b, c, _, _ = x.size()
-            y = self.squeeze(x).view(b, c)
-            y = self.excitation(y).view(b, c, 1, 1)
-            return y
-    
-    
-    
     def __init__(self, model_name, n_ch, n_cls):
         super(EnsembleNet, self).__init__()
         
@@ -60,7 +39,6 @@ class EnsembleNet(nn.Module):
             self.enet = model = ENet(self.n_classes)
             
         if 'ensemble' in self.model_name:
-            
             self.unet = UNet(n_channels=self.n_channels, n_classes=self.n_classes, bilinear=True)
             self.segnet = SegNet(n_channels=self.n_channels, n_classes=self.n_classes)
             self.enet = ENet(self.n_classes)
@@ -70,26 +48,22 @@ class EnsembleNet(nn.Module):
             self.conv1x1_segnet = nn.Conv2d(self.n_classes, self.n_classes, kernel_size=1)
             self.conv1x1_enet = nn.Conv2d(self.n_classes, self.n_classes, kernel_size=1)
 
-            # Squeeze-and-Excitation (SE) blocks
-            self.se_block_unet = self.SEBlock(self.n_classes)
-            self.se_block_segnet = self.SEBlock(self.n_classes)
-            self.se_block_enet = self.SEBlock(self.n_classes)
-
             self.conv_concat = nn.Conv2d(self.n_classes * 3, self.n_classes, kernel_size=1)
 
             self.conv_batchnorm1 = nn.Sequential(
-                nn.Conv2d(self.n_classes, self.n_classes * 2, kernel_size=3, padding=1),
-                nn.BatchNorm2d(self.n_classes * 2),
-                nn.LeakyReLU(inplace=True)
+                nn.Conv2d(self.n_classes, self.n_classes * 4, kernel_size=3, padding=1),
+                nn.BatchNorm2d(self.n_classes * 4),
+                nn.ReLU(inplace=True)
             )
             self.conv_batchnorm2 = nn.Sequential(
-                nn.Conv2d(self.n_classes * 2, self.n_classes, kernel_size=3, padding=1),
-                nn.BatchNorm2d(self.n_classes),
-                nn.LeakyReLU(inplace=True)
+                nn.Conv2d(self.n_classes * 4, self.n_classes * 4, kernel_size=3, padding=1),
+                nn.BatchNorm2d(self.n_classes * 4),
+                nn.ReLU(inplace=True)
             )
 
-            self.conv_out = nn.Conv2d(self.n_classes, self.n_classes, kernel_size=1)
-        
+            self.conv_out = nn.Conv2d(self.n_classes * 4, self.n_classes, kernel_size=1)
+    
+    
 
     def forward(self, x):
     
@@ -112,27 +86,40 @@ class EnsembleNet(nn.Module):
             return unet_out, segnet_out, enet_out
                 
         if self.model_name == 'ensemble_fusion':
-
+            '''
+            fused_out = torch.cat([self.unet(x), self.segnet(x), self.enet(x)], dim=1)
+            bn_out = self.conv_batchnorm1(fused_out)
+            bn_out = self.conv_batchnorm2(bn_out)
+            bn_out = self.conv_batchnorm3(bn_out)
+            bn_out = self.conv_batchnorm4(bn_out)
+            out = self.conv_out(bn_out)
+            '''
+            
             unet_output = self.unet(x)
             segnet_output = self.segnet(x)
-            enet_output = self.enet(x)       
+            enet_output = self.enet(x)    
             
-            # Apply 1x1 convolutions and SE blocks to each prediction
-            unet_pred = self.conv1x1_unet(unet_output) * self.se_block_unet(unet_output)
-            segnet_pred = self.conv1x1_segnet(segnet_output) * self.se_block_segnet(segnet_output)
-            enet_pred = self.conv1x1_enet(enet_output) * self.se_block_enet(enet_output)
+            # Apply 1x1 convolutions for dimension reduction
+            unet_output = self.conv1x1_unet(unet_output)
+            segnet_output = self.conv1x1_segnet(segnet_output)
+            enet_output = self.conv1x1_enet(enet_output)
 
-            # Concatenate predictions
-            concat_pred = torch.cat((unet_pred, segnet_pred, enet_pred), dim=1)
+            # Upsample ENet output to match other outputs
+            enet_output = F.interpolate(enet_output, size=segnet_output.shape[2:], mode='bilinear', align_corners=True)
 
-            # Apply convolution and batch normalization
-            concat_pred = self.conv_concat(concat_pred)
-            concat_pred = self.conv_batchnorm1(concat_pred)
-            concat_pred = self.conv_batchnorm2(concat_pred)
+            # Concatenate outputs
+            concat_output = torch.cat((unet_output, segnet_output, enet_output), dim=1)
 
-            # Final output
-            out = self.conv_out(concat_pred)
+            # Additional layers
+            concat_output = self.conv_concat(concat_output)
+            concat_output = self.conv_batchnorm1(concat_output)
+            concat_output = self.conv_batchnorm2(concat_output)
 
+            # Final convolution for output
+            out = self.conv_out(concat_output)
+        
+            
             
             return out     
             
+
