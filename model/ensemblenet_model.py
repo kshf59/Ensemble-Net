@@ -15,17 +15,40 @@ from model.Enet.enet import ENet
 #stacking
 #feature fusion
 
-class AttentionModule(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super(AttentionModule, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
-        self.sigmoid = nn.Sigmoid()
+class ChannelSpatialAttentionModule(nn.Module):
+    def __init__(self, in_channels, reduction_ratio=16):
+        super(ChannelSpatialAttentionModule, self).__init__()
+        reduced_channels = max(1, in_channels // reduction_ratio)
+
+        self.channel_attention = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(in_channels, reduced_channels, kernel_size=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(reduced_channels, in_channels, kernel_size=1),
+            nn.Sigmoid()
+        )
+        
+        self.spatial_attention = nn.Sequential(
+            nn.Conv2d(2, 1, kernel_size=7, padding=3),
+            nn.Sigmoid()
+        )
 
     def forward(self, x):
-        attention = self.sigmoid(self.conv(x))
-        return x * attention
-
-
+        #print(f"Input x shape: {x.shape}")  # 입력 크기 출력
+        channel_att = self.channel_attention(x)
+        #print(f"Channel attention shape: {channel_att.shape}")  # 채널 어텐션 후 크기 출력
+        channel_att = x * channel_att
+        
+        # Spatial attention
+        max_pool = torch.max(channel_att, dim=1, keepdim=True)[0]
+        avg_pool = torch.mean(channel_att, dim=1, keepdim=True)
+        spatial_att_input = torch.cat([max_pool, avg_pool], dim=1)
+        spatial_att = self.spatial_attention(spatial_att_input)
+        spatial_att = channel_att * spatial_att
+        #print(f"Final output shape: {spatial_att.shape}")  # 최종 출력 크기 출력
+        
+        return spatial_att
+    
 class EnsembleNet(nn.Module):
     def __init__(self, model_name, n_ch, n_cls):
         super(EnsembleNet, self).__init__()
@@ -52,15 +75,16 @@ class EnsembleNet(nn.Module):
             self.segnet = SegNet(n_channels=self.n_channels, n_classes=self.n_classes)
             self.enet = ENet(self.n_classes)
             
+            
+            # Replace AttentionModule with ChannelSpatialAttentionModule
+            self.attention_unet = ChannelSpatialAttentionModule(self.n_classes)
+            self.attention_segnet = ChannelSpatialAttentionModule(self.n_classes)
+            self.attention_enet = ChannelSpatialAttentionModule(self.n_classes)
+            
             # Additional layers for ensemble
             self.conv1x1_unet = nn.Conv2d(self.n_classes, self.n_classes, kernel_size=1)
             self.conv1x1_segnet = nn.Conv2d(self.n_classes, self.n_classes, kernel_size=1)
             self.conv1x1_enet = nn.Conv2d(self.n_classes, self.n_classes, kernel_size=1)
-
-            # Attention modules for each model output
-            self.attention_unet = AttentionModule(self.n_classes, self.n_classes)
-            self.attention_segnet = AttentionModule(self.n_classes, self.n_classes)
-            self.attention_enet = AttentionModule(self.n_classes, self.n_classes)
 
             # Convolution to concatenate all model outputs
             self.conv_concat = nn.Conv2d(self.n_classes * 3, self.n_classes, kernel_size=1)
@@ -105,10 +129,8 @@ class EnsembleNet(nn.Module):
             segnet_out = self.attention_segnet(self.conv1x1_segnet(self.segnet(x)))
             enet_out = self.attention_enet(self.conv1x1_enet(self.enet(x)))
 
-            # Concatenate all model outputs
+            # Concatenate all model outputs and apply convolution
             concatenated = torch.cat((unet_out, segnet_out, enet_out), dim=1)
-
-            # Apply convolution to concatenated outputs
             concatenated = self.conv_concat(concatenated)
 
             # Enhance features
