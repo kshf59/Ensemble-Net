@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from model.unet.unet_model import UNet
 from model.segnet.segnet_model import SegNet
 from model.Enet.enet import ENet
+from model.fusion.ensemble_fusion_model import EnsembleFusion
 #from torchvision.models.segmentation import deeplabv3_resnet101 as DeepLabv3
 #from torchvision.models.segmentation import deeplabv3_mobilenet_v3_large as DeepLabv3
 #from torchvision.models.segmentation import lraspp_mobilenet_v3_large as DeepLabv3
@@ -14,16 +15,6 @@ from model.Enet.enet import ENet
 #voting
 #stacking
 #feature fusion
-
-class AttentionModule(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super(AttentionModule, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
-        attention = self.sigmoid(self.conv(x))
-        return x * attention
 
 
 class EnsembleNet(nn.Module):
